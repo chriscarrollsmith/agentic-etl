@@ -1,0 +1,18 @@
+---
+description: Understanding the project
+globs: 
+alwaysApply: true
+---
+This repository contains instructions to guide a Claude 3.7-powered Cursor Agent in:
+
+1. Scraping data or documents from the Internet
+2. Transforming the scraped examples into structured JSON data
+3. Uploading to a database
+
+The workflow was created and documented with an eye to generalizability and repeatability by AI agents with minimal human intervention. The steps mostly involve MCP tool calls, CLI commands, and bash and python scripts, not web interfaces.
+
+Remember to *never* hard-code secrets in scripts. Secrets may be written to `.env` and programmatically retrieved from there. Never use placeholder secrets, but feel free to request human intervention for generating and managing secrets if you find yourself unable to create and/or manage them yourself from the command line.
+
+Working documents and helper files which will not be retained may be placed in the `artifacts` folder.
+
+To avoid confusion, you should keep your bash console opened to the project root folder and should specify all file paths in relation to the project root.
