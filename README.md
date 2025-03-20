@@ -26,26 +26,36 @@ The workflow is supported by Cursor Rules in the `.cursor/rules` directory that 
 ## Prerequisites
 
 - [Cursor](https://www.cursor.com/)
+- [Node.js](https://nodejs.org/en/download/)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- [LLM CLI utility](https://llm.datasette.io/en/stable/)
 - [Perplexity API Key](https://www.perplexity.ai/settings/api)
-- Perplexity and Playwright MCP Tools - Add the following in `File > Cursor Settings > MCP > Add new global MCP server`, replacing `your_perplexity_api_key` with your actual Perplexity API key:
+- Perplexity and Playwright MCP Tools - Put the following in `File > Cursor Settings > MCP > Add new global MCP server`, replacing `your_perplexity_api_key` with your actual Perplexity API key:
    ```json
    {
-   "mcpServers": {
-      "perplexity-mcp": {
-         "env": {
-         "PERPLEXITY_API_KEY": "your_perplexity_api_key",
-         "PERPLEXITY_MODEL": "sonar"
+      "mcpServers": {
+         "perplexity-mcp": {
+            "env": {
+            "PERPLEXITY_API_KEY": "your_perplexity_api_key",
+            "PERPLEXITY_MODEL": "sonar"
+            },
+            "command": "uvx",
+            "args": [
+            "perplexity-mcp"
+            ]
          },
-         "command": "uvx",
-         "args": [
-         "perplexity-mcp"
-         ]
-      },
-      "playwright": {
-         "command": "npx",
-         "args": ["-y", "@executeautomation/playwright-mcp-server"]
+         "playwright": {
+            "command": "npx",
+            "args": ["-y", "@executeautomation/playwright-mcp-server"]
+         },
+         "taskmanager": {
+            "command": "npx",
+            "args": [
+            "-y",
+            "@chriscarrollsmith/mcp-taskmanager"
+            ]
+         }
       }
-   }
    }
    ```
 
