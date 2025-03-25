@@ -1,0 +1,200 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+This guide shows how to transform raw scraped data into structured JSON, with additional sections on using Litellm and the Deepseek model for AI-driven extraction, classification, or annotation tasks. The Deepseek model is attractive because it's fast, inexpensive, and rarely hits rate limits, making it ideal for large-scale or high-throughput data transformation pipelines.
+
+## 1. Adding Unique Identifiers to Raw Scraped Records
+
+When you scrape sources, you might just have a list of dictionaries or objects without any stable unique ID. It's useful to assign your own IDs to keep track of records across your pipeline.
+
+```python
+next_pub_id = 1
+for pub in publications:
+    if 'id' not in pub:
+        pub['id'] = f'pub_{next_pub_id:03d}'
+        next_pub_id += 1
+```
+
+## 2. Deduplicating Results
+
+If the same resource appears more than once, you’ll want to remove duplicates before writing your final output:
+
+```python
+all_urls = set()
+results = []
+
+new_data = [
+    {"url": "https://example.com/item1", "title": "Item One"},
+    {"url": "https://example.com/item2", "title": "Item Two"},
+    {"url": "https://example.com/item1", "title": "Repeated Item One"},
+]
+
+for item in new_data:
+    if item["url"] not in all_urls:
+        all_urls.add(item["url"])
+        results.append(item)
+
+print(results)  # Only unique items remain
+```
+
+## 3. Using Litellm with Deepseek for AI-Driven Data Enrichment
+
+AI models like those hosted by Deepseek allow you to automate the process of classification, annotation, or extraction. Below you'll see how to integrate Litellm's asynchronous calls with the Deepseek model in a real-world use case.
+
+### 3.1. Installing and Configuring Dependencies
+
+Ensure you have installed the following packages:
+
+- litellm (for making requests to large language models)  
+- tenacity (for retry logic)  
+- python-dotenv (for loading environment variables)  
+- pydantic (for data validation)  
+
+Install them via pip:
+
+```bash
+pip install litellm pydantic tenacity python-dotenv
+```
+
+Additionally, set up your environment variable DEEPSEEK_API_KEY in a .env file (or in your environment) so that Litellm can access your Deepseek instance:
+
+```bash
+# .env
+DEEPSEEK_API_KEY=your-deepseek-api-key
+```
+
+### 3.2. Example Python Script for Classification
+
+Below is an illustrative snippet showing how to use Litellm with the Deepseek model to classify and annotate download links. It sets up a minimal Pydantic model, constructs a prompt, and sends it to the Deepseek model. The snippet is based on the full script you provided but is shortened for clarity.
+
+```python
+import os
+import json
+import asyncio
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from tenacity import retry, stop_after_attempt, wait_exponential
+from litellm import acompletion
+
+load_dotenv()
+
+class LinkClassification(BaseModel):
+    """Classification for a single link."""
+    to_download: bool
+    type: str = Field(..., description="One of 'main', 'supplemental', or 'other'")
+
+class LLMOutput(BaseModel):
+    """A Pydantic model that represents the JSON structure expected from the LLM."""
+    results: list[LinkClassification] = Field(default_factory=list)
+
+def parse_llm_json_response(content: str) -> LLMOutput:
+    """Convert a string of JSON or a code-fenced JSON snippet to an LLMOutput object."""
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        # fallback logic for code fences
+        if '```json' in content:
+            content = content.split('```json')[1].split('```')[0].strip()
+        data = json.loads(content)
+    return LLMOutput(**data)
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+async def classify_links(link_info: list[dict]) -> LLMOutput:
+    """Use the Deepseek model to classify a list of link dictionaries."""
+    prompt = (
+        "For each link in the following array of {url, text}, return an array"
+        " of objects { 'to_download', 'type': 'main'|'supplemental'|'other' }.\n"
+        "Consider the guidelines:\n"
+        " - The 'main' type is for the principal document.\n"
+        " - 'supplemental' for attachments like appendices.\n"
+        " - 'other' for items that do not fit.\n"
+        " - 'to_download' is True for the most parseable English version.\n\n"
+        f"Links:\n{json.dumps(link_info, indent=2)}\n"
+    )
+
+    response = await acompletion(
+        model="deepseek/deepseek-chat",
+        messages=[{"role": "system", "content": "You classify links into a structured JSON format."},
+                {"role": "user",   "content": prompt}],
+        response_format={"type": "json_object"},
+        api_key=os.getenv('DEEPSEEK_API_KEY'),
+    )
+    content = response["choices"][0]["message"]["content"]
+    return parse_llm_json_response(content)
+
+async def main():
+    # Suppose we have a list of link dictionaries
+    links_to_classify = [
+        {"url": "http://example.com/report.pdf", "text": "Main Report"},
+        {"url": "http://example.com/annex.pdf",  "text": "Annex Document"},
+        {"url": "http://example.com/image.jpg",  "text": "An image"}
+    ]
+
+    result = await classify_links(links_to_classify)
+
+    # Merge classification results back into your records
+    for link, classification in zip(links_to_classify, result.results):
+        link["to_download"] = classification.to_download
+        link["type"] = classification.type
+
+    print("Classified links:", json.dumps(links_to_classify, indent=2))
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+In the above code:  
+
+- We use Litellm's acompletion function to asynchronously send requests to the Deepseek model.  
+- The prompt is carefully structured so that the model responds with JSON.  
+- We parse the response using standard Python JSON methods (with a fallback for code-fenced output).  
+- Pydantic's BaseModel helps enforce schema validation on the result.  
+
+**Note**: For processing multiple batches concurrently, you can use `asyncio.gather()`:
+
+```python
+# Process multiple batches concurrently
+tasks = [classify_links(batch) for batch in batches]
+results = await asyncio.gather(*tasks)
+```
+
+Deepseek's API handles this well without rate limiting issues.
+
+## 4. Extending to AI Text Extraction or Annotation
+
+Beyond link classification, you can easily adapt this approach to more general extraction or annotation tasks—for example, summarizing documents, extracting named entities, or labeling text with categories.
+
+### 4.1. Using the Same Pattern for Extraction
+
+Keep the same structure—define a Pydantic model for your expected JSON. Suppose you want to extract person names and organizations from a text. You might define:
+
+```python
+class EntityExtractionOutput(BaseModel):
+    people: list[str]
+    organizations: list[str]
+```
+
+Then craft a prompt:
+
+```python
+prompt = (
+    "Extract all personal names and organization names from the following text. "
+      "Return a JSON object with the fields 'people' and 'organizations', each "
+      "being a list of strings.\n\n"
+      "Text:\n" + your_text
+  )
+```
+
+Send the request to the Deepseek model, parse the JSON, and you have your extracted data.
+
+### 4.2. Combining the Steps
+
+You might do the following in your pipeline:
+
+1. Download each file.
+2. Detect file type.
+3. Convert to text using an appropriate parser.
+4. Send the text to the Deepseek model for entity extraction, classification, or summarization.
+5. Store the AI-enhanced metadata or text in your database.

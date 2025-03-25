@@ -16,10 +16,8 @@ Most ETL repositories on Github are mechanical software tools designed for a spe
 
 After presenting your use case to the agent, you should prompt the agent to follow the steps in the order listed below.
 
-1. **Data Collection**
-   - [`1-scraping.md`](workflow/1-scraping.md) - Scripted process for scraping or acquiring data
-2. **Data Processing**
-   - [`2-extracting-to-json.md`](workflow/2-extracting-to-json.md) - Scripted process for extracting scraped data to structured JSON
+1. **Data Collection** - The agent can reference the `.cursor/rules/python_scraping.mdc` rule for help with scraping.
+2. **Data Processing** - The agent can reference the `.cursor/rules/python_cleaning.mdc` rule for help with transforming scraped data into clean JSON.
 
 The workflow is supported by Cursor Rules in the `.cursor/rules` directory that provide additional context and guidelines for AI agents working with the codebase.
 
@@ -41,7 +39,7 @@ The workflow is supported by Cursor Rules in the `.cursor/rules` directory that 
             },
             "command": "uvx",
             "args": [
-            "perplexity-mcp"
+            "mcp-perplexity"
             ]
          },
          "playwright": {
