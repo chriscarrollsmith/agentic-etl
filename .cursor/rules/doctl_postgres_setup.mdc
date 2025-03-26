@@ -1,0 +1,265 @@
+---
+description: Setting Up a PostgreSQL Database on DigitalOcean
+globs: 
+alwaysApply: false
+---
+This document outlines the steps to create the necessary DigitalOcean infrastructure for hosting a PostgreSQL database and configuring it for secure access, including:
+
+1. Creating a new project
+2. Setting up a managed PostgreSQL database
+3. Creating a droplet for API or application deployment (optional)
+4. Setting up database users and permissions
+5. Storing connection details securely
+
+## Prerequisites
+
+- [DigitalOcean](mdc:https:/www.digitalocean.com) account
+- [`doctl` CLI tool](mdc:https:/docs.digitalocean.com/reference/doctl) installed and authenticated
+- [`psql` client](mdc:https:/www.postgresql.org/download) installed
+
+## 1. Verify Authentication
+
+First, verify that `doctl` is installed and authenticated:
+
+```bash
+# Check doctl version
+doctl version
+
+# Verify authentication
+doctl account get
+```
+
+If you're not authenticated, run:
+
+```bash
+doctl auth init
+```
+
+## 2. Create a Project
+
+Create a new project to organize your resources:
+
+```bash
+# List existing projects
+doctl projects list
+
+# Create a new project
+doctl projects create --name "YOUR-PROJECT-NAME" --purpose "YOUR-PROJECT-PURPOSE" --environment "Production"
+```
+
+Take note of the Project ID in the output for later use.
+
+## 3. Set Up a Managed PostgreSQL Database
+
+Explore the available database options:
+
+```bash
+# Check available database engines
+doctl databases options engines
+
+# Check available PostgreSQL versions
+doctl databases options versions pg
+
+# Check available regions
+doctl databases options regions pg
+
+# Check available instance sizes
+doctl databases options slugs --engine pg
+```
+
+Create a PostgreSQL database:
+
+```bash
+doctl databases create your-db-name --engine pg --version 17 --region nyc3 --size db-s-1vcpu-1gb --num-nodes 1 --wait
+```
+
+Retrieve the database connection details:
+
+```bash
+# Get the database ID from the output of the create command
+DATABASE_ID="your-database-id"
+
+# Get connection details
+doctl databases connection $DATABASE_ID --format Host,Port,User,Password,Database
+```
+
+Store these details securely in a `.env` file:
+
+```bash
+# Database connection parameters
+DB_HOST=your-host
+DB_PORT=your-port
+DB_USER=your-user
+DB_PASS=your-password
+DB_NAME=your-database
+
+# Database connection URI
+DB_URI="postgres://your-user:your-password@your-host:your-port/your-database?sslmode=require"
+
+# Digital Ocean database ID
+DO_DATABASE_ID=your-database-id
+```
+
+## 4. (Optional) Create a Droplet for Application Deployment
+
+If you need a server to host your application, you can create a droplet:
+
+**Important:** Before creating your droplet, verify that you have valid Digital Ocean compute SSH key access:
+
+```bash
+# List SSH keys in your Digital Ocean account
+doctl compute ssh-key list
+
+# Ensure at least one key from the list has a matching private key on your local machine
+# If no matching keys exist, generate and import a new one:
+ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+doctl compute ssh-key import "droplet-access-key" --public-key-file ~/.ssh/id_rsa.pub
+
+# Verify fingerprints match between your local key and the one in Digital Ocean
+ssh-keygen -l -f ~/.ssh/id_rsa  # Compare this output with the fingerprint from doctl ssh-key list
+```
+
+Check available droplet sizes:
+
+```bash
+doctl compute size list
+```
+
+Create a droplet:
+
+```bash
+doctl compute droplet create your-droplet-name --region nyc3 --size s-1vcpu-1gb --image ubuntu-22-04-x64 --ssh-keys $(doctl compute ssh-key list --format ID --no-header) --wait
+```
+
+Assign the droplet to your project:
+
+```bash
+# Get the droplet ID from the output of the create command
+DROPLET_ID="your-droplet-id"
+PROJECT_ID="your-project-id"
+
+doctl projects resources assign $PROJECT_ID --resource="do:droplet:$DROPLET_ID"
+```
+
+Add the droplet details to your `.env` file:
+
+```bash
+# Droplet details
+DROPLET_ID=your-droplet-id
+DROPLET_NAME=your-droplet-name
+DROPLET_IP=your-droplet-ip
+```
+
+## 5. Set Up Database Users and Permissions
+
+After creating the database, you'll typically want to set up additional users with appropriate permissions. Here's a template for creating a new user:
+
+```sql
+-- Create a new user with login capabilities
+CREATE ROLE app_user WITH LOGIN PASSWORD 'your-secure-password';
+
+-- Create an application schema
+CREATE SCHEMA IF NOT EXISTS app;
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA app TO app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO app_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA app TO app_user;
+
+-- Set default privileges for future tables
+ALTER DEFAULT PRIVILEGES IN SCHEMA app
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA app
+    GRANT USAGE, SELECT ON SEQUENCES TO app_user;
+```
+
+You can save this SQL to a file (e.g., `setup_db_users.sql`) and run it using:
+
+```bash
+PGPASSWORD=$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f setup_db_users.sql
+```
+
+## 6. Verify Setup
+
+Verify that your database is running:
+
+```bash
+doctl databases list
+```
+
+If you created a droplet, verify that it's running:
+
+```bash
+doctl compute droplet list
+```
+
+Test connecting with the new user:
+
+```bash
+PGPASSWORD=your-secure-password psql -h $DB_HOST -p $DB_PORT -U app_user -d $DB_NAME -c "SELECT current_user, current_database();"
+```
+
+## Security Best Practices
+
+1. Always use strong, randomly generated passwords for database users
+2. Store sensitive information in `.env` files and add them to `.gitignore`
+3. Use the principle of least privilege when granting permissions
+4. Enable SSL for database connections
+5. Regularly update database and droplet software
+6. Monitor database and droplet metrics using DigitalOcean's monitoring tools
+7. Set up regular database backups
+8. Consider using DigitalOcean's firewall rules to restrict access
+
+## Maintenance Tasks
+
+### Backup and Restore
+
+```bash
+# Create a backup
+doctl databases backup create your-database-id
+
+# List backups
+doctl databases backups list your-database-id
+
+# Restore from backup
+doctl databases backup restore your-database-id --backup-id your-backup-id
+```
+
+### Monitoring
+
+```bash
+# View database metrics
+doctl databases metrics your-database-id
+
+# View database logs
+doctl databases logs your-database-id
+```
+
+### Scaling
+
+```bash
+# Resize database cluster
+doctl databases resize your-database-id --size db-s-2vcpu-4gb
+
+# Add a standby node
+doctl databases replica create your-database-id
+``` 
+
+## End-to-End Automation
+
+A customizable end-to-end automation script is available as a [GitHub Gist](mdc:https:/gist.github.com/chriscarrollsmith/756e5ee2b4735952036ef3b79075580c). The script automates all the steps in this document and includes features like secure password generation, comprehensive error handling, and setup verification. You can use it as follows:
+
+```bash
+# Download the script
+curl -O https://gist.githubusercontent.com/chriscarrollsmith/756e5ee2b4735952036ef3b79075580c/raw/setup_postgres_db.sh
+
+# Make it executable
+chmod +x setup_postgres_db.sh
+
+# Run with custom settings
+PROJECT_NAME="my-app" \
+DB_SIZE="db-s-2vcpu-2gb" \
+DB_REGION="sfo3" \
+CREATE_DROPLET="true" \
+./setup_postgres_db.sh
+```

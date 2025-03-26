@@ -1,0 +1,246 @@
+---
+description: Uploading JSON Data to Digital Ocean PostgreSQL
+globs: 
+alwaysApply: false
+---
+This guide outlines the steps to upload JSON data to a Digital Ocean PostgreSQL database, including schema initialization and data import.
+
+## Prerequisites
+
+- `psql` client installed
+- Python 3.10+ installed
+- `uv` or `pip` package manager installed
+- Digital Ocean PostgreSQL database set up
+- Database users and permissions configured
+- `.env` file with database connection details
+
+If not done already, review and follow the Digital Ocean database setup rules.
+
+## 1. Install Required Python Packages
+
+Install the required Python packages:
+
+```bash
+# Using uv
+uv add psycopg python-dotenv
+
+# Or using pip
+pip install psycopg python-dotenv
+```
+
+## 2. Initialize the Database Schema
+
+Create a SQL script (`init_db_schema.sql`) to set up your tables and indexes. Here's a sample schema:
+
+```sql
+-- Example schema for storing JSON data
+CREATE TABLE IF NOT EXISTS data_records (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    metadata JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for faster searches
+CREATE INDEX IF NOT EXISTS data_records_category_idx ON data_records(category);
+
+-- Create function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to update updated_at timestamp
+CREATE TRIGGER update_data_records_updated_at
+BEFORE UPDATE ON data_records
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+```
+
+Initialize the schema:
+
+```bash
+PGPASSWORD=$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f init_db_schema.sql 2>&1 | cat
+```
+
+## 3. Create a Python Upload Script
+
+Here's a template for uploading JSON data (`upload_to_postgres.py`):
+
+```python
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Dict, List, Any, Optional
+
+import psycopg
+from dotenv import load_dotenv
+
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Upload JSON data to PostgreSQL database")
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default="data",
+        help="Directory containing JSON files (default: data)",
+    )
+    parser.add_argument(
+        "--env-file",
+        type=str,
+        default=".env",
+        help="Environment file path (default: .env)",
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Enable verbose output",
+    )
+    return parser.parse_args()
+
+def load_env_vars(env_file: str) -> Dict[str, str]:
+    """Load environment variables from .env file."""
+    if not os.path.exists(env_file):
+        print(f"Error: Environment file {env_file} not found")
+        sys.exit(1)
+    
+    load_dotenv(env_file)
+    
+    required_vars = ["DB_HOST", "DB_PORT", "DB_USER", "DB_PASS", "DB_NAME"]
+    env_vars = {}
+    
+    for var in required_vars:
+        value = os.getenv(var)
+        if not value:
+            print(f"Error: Required environment variable {var} not found in {env_file}")
+            sys.exit(1)
+        env_vars[var] = value
+    
+    return env_vars
+
+def connect_to_db(env_vars: Dict[str, str]) -> psycopg.Connection:
+    """Connect to PostgreSQL database."""
+    try:
+        conn = psycopg.connect(
+            host=env_vars["DB_HOST"],
+            port=env_vars["DB_PORT"],
+            user=env_vars["DB_USER"],
+            password=env_vars["DB_PASS"],
+            dbname=env_vars["DB_NAME"],
+        )
+        return conn
+    except Exception as e:
+        print(f"Error connecting to database: {e}")
+        sys.exit(1)
+
+def import_record(conn: psycopg.Connection, record: Dict[str, Any], verbose: bool) -> Optional[str]:
+    """Import record into database."""
+    record_id = record.get("id", "")
+    title = record.get("title", "")
+    category = record.get("category", "")
+    metadata = json.dumps(record.get("metadata", {}))
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO data_records (id, title, category, metadata)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    title = EXCLUDED.title,
+                    category = EXCLUDED.category,
+                    metadata = EXCLUDED.metadata,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (record_id, title, category, metadata),
+            )
+            conn.commit()
+            
+            if verbose:
+                print(f"Imported record: {title}")
+            
+            return record_id
+    except Exception as e:
+        conn.rollback()
+        print(f"Error importing record {title}: {e}")
+        return None
+
+def main():
+    args = parse_args()
+    env_vars = load_env_vars(args.env_file)
+    conn = connect_to_db(env_vars)
+    
+    # Process JSON files
+    data_path = Path(args.data_dir)
+    if not data_path.exists():
+        print(f"Error: Data directory {args.data_dir} not found")
+        sys.exit(1)
+    
+    for file_path in data_path.glob("*.json"):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                record = json.load(f)
+                import_record(conn, record, args.verbose)
+        except Exception as e:
+            print(f"Error processing {file_path}: {e}")
+    
+    conn.close()
+
+if __name__ == "__main__":
+    main()
+```
+
+## 4. Verify Environment Variables
+
+Verify that your `.env` file is set up with your Digital Ocean PostgreSQL connection details:
+
+```bash
+DB_HOST=your-db-host.digitalocean.com
+DB_PORT=25060  # Default DO Postgres port
+DB_USER=your-username
+DB_PASS=your-password
+DB_NAME=your-database
+```
+
+## 5. Run the Upload Script
+
+```bash
+# Run the script with default options
+python upload_to_postgres.py
+
+# Or with custom options
+python upload_to_postgres.py --data-dir /path/to/json/files --env-file /path/to/.env --verbose
+```
+
+## 6. Verify the Upload
+
+Check that your data was uploaded correctly:
+
+```bash
+# Count records
+PGPASSWORD=$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM data_records;" | cat
+
+# List records by category
+PGPASSWORD=$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT category, COUNT(*) FROM data_records GROUP BY category ORDER BY category;" | cat
+```
+
+## Troubleshooting
+
+### Connection Issues
+
+- Verify that the database is running: `doctl databases list`
+- Check the connection details in your `.env` file
+- Ensure that your IP address is allowed in the database's firewall settings
+
+### Schema Issues
+
+- Verify table creation: `PGPASSWORD=$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "\dt"` | cat
