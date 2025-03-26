@@ -1,0 +1,160 @@
+---
+description: Converting unstructured data into structured JSON outputs with Bash and the `llm` CLI tool
+globs: 
+alwaysApply: false
+---
+## Bash and LLM Tools for Data Cleaning and Transformation
+
+This guide explains how to combine bash scripting with LLM tools to clean and transform data. This pattern is particularly useful when dealing with semi-structured data that needs to be converted into a more structured format.
+
+**The Core Idea:**
+
+The method revolves around using bash scripts to orchestrate a pipeline where:
+1. Raw data is preprocessed using standard Unix tools
+2. An LLM transforms the cleaned data into a structured format
+3. The results are validated and stored in a consistent way
+
+**Key Concepts and Code Patterns:**
+
+1. **Setting Up the Processing Pipeline:**
+
+   ```bash
+   #!/bin/bash
+   
+   # Create output directory if it doesn't exist
+   mkdir -p "../processed_data"
+   
+   # Define schema for structured output
+   schema='field1: description, field2: description, field3: description'
+   
+   # Load system prompt for the LLM
+   system_prompt=$(cat prompt.txt)
+   ```
+
+3. **Mechanical Data Cleaning:**
+
+   ```bash
+   preprocess_data() {
+     # Remove unwanted characters/formatting
+     sed 's/[^[:print:]]//g' | \
+     # Strip specific tags or markers
+     sed 's/<[^>]*>//g' | \
+     # Normalize whitespace
+     tr -s ' ' | \
+     # Additional cleaning as needed
+     your_custom_cleaning_command
+   }
+   ```
+
+2. **Converting Inputs to Structured Outputs with an LLM:**
+
+   ```bash
+   # Process all files in a directory
+   process_all() {
+     local input_dir="../raw_data"
+     local count=$(ls -1 $input_dir/* 2>/dev/null | wc -l)
+     echo "Found $count files to process."
+     
+     for file in $input_dir/*; do
+       process_single_file "$file"
+     done
+   }
+   
+   # Process a single file using 'llm' CLI tool
+   process_single_file() {
+     local file=$1
+     local basename=$(basename "$file")
+     echo "Processing $basename..."
+     
+     cat "$file" | \
+       preprocess_data | \
+       llm --schema "$schema" \
+           --system "$system_prompt" \
+           > "../processed_data/${basename}.json"
+   }
+   ```
+
+4. **Validating Outputs:**
+
+   ```bash
+   verify_output() {
+     echo "Verifying processed data..."
+     
+     # Count processed files
+     local json_count=$(ls -1 ../processed_data/*.json 2>/dev/null | wc -l)
+     
+     # Validate JSON structure
+     local invalid_count=0
+     for file in ../processed_data/*.json; do
+       if ! jq empty "$file" 2>/dev/null; then
+         echo "  Error: $file is not valid JSON."
+         invalid_count=$((invalid_count + 1))
+       fi
+     done
+     
+     # Check required fields
+     for file in ../processed_data/*.json; do
+       local missing_fields=$(jq -r 'select(
+         .field1 == null or
+         .field2 == null or
+         .field3 == null
+       )' "$file")
+       
+       if [ ! -z "$missing_fields" ]; then
+         echo "  Warning: $file is missing required fields."
+       fi
+     done
+   }
+   ```
+
+5. **Command Line Interface Pattern:**
+
+   ```bash
+   usage() {
+     echo "Usage: $0 [OPTION]"
+     echo "Process data files and extract structured information."
+     echo ""
+     echo "Options:"
+     echo "  -s, --single FILE   Process a single file"
+     echo "  -a, --all           Process all files (default)"
+     echo "  -v, --verify        Verify the processed results"
+     echo "  -h, --help          Display this help message"
+   }
+
+   # Parse command line arguments
+   while [ $# -gt 0 ]; do
+     case "$1" in
+       -s|--single)
+         process_single_file "$2"
+         shift 2
+         ;;
+       -a|--all)
+         process_all
+         shift
+         ;;
+       -v|--verify)
+         verify_output
+         shift
+         ;;
+       -h|--help)
+         usage
+         exit 0
+         ;;
+       *)
+         echo "Unknown option: $1"
+         usage
+         exit 1
+         ;;
+     esac
+   done
+   ```
+
+**Best Practices:**
+
+This pattern can be adapted for various data cleaning tasks by:
+1. Modifying the preprocessing function for your data format
+2. Adjusting the schema for your desired output structure
+3. Customizing the validation steps for your requirements
+4. Adding specific error handling for your use case
+
+Remember to test with a small sample of data first and gradually scale up to the full dataset. 

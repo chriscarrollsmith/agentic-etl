@@ -1,5 +1,5 @@
 ---
-description: 
+description: Transforming raw scraped data into JSON with Python
 globs: 
 alwaysApply: false
 ---

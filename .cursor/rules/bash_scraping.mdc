@@ -1,0 +1,62 @@
+---
+description: Scraping and extracting data from simple static websites with Bash and `wget`
+globs: 
+alwaysApply: false
+---
+## Bash and `wget` for Simple Website Scraping
+
+This guide explains how to use `bash` scripting and the `wget` command-line tool to scrape HTML. Only works for static websites, but is often the most efficient tool for simple scraping jobs.
+
+**The Core Idea:**
+
+The method revolves around downloading the HTML source code of a webpage and then using text processing tools like `grep` and `sed` to extract specific information based on patterns in the HTML.
+
+**Key Concepts and Code Patterns:**
+
+1. **Downloading Webpages with `wget`:**
+
+   ```bash
+   wget -q -O artifacts/example.html https://example.com
+   ```
+
+   - `wget <url>`: Downloads the content from the specified URL.
+   - `-q`:  Quiet mode. Suppresses `wget`'s output to the terminal (makes the script cleaner).
+   - `-O <filename>`: Specifies the output filename.
+
+2. **Extracting Data with `grep`:**
+
+   ```bash
+   grep -o '<a href="https://example.com/[^"]*/">[^<]*</a>' artifacts/example.html
+   ```
+
+   - `grep <pattern> <file>`:  Searches for lines in a file that match the specified pattern.
+   - `-o`:  Only print the *matching* parts of the lines, not the whole lines.
+   
+3. **Validate that the HTML contains the desired content:**
+   
+   If you find no matches with `grep`,
+   
+   1. your pattern may be wrong, or 
+   2. the webpage might be loaded dynamically, in which case you'll need a more sophisticated scraping tool.
+   
+   If you try two or three times and still don't find any matches, try sending the HTML to a long-context LLM to determine if it contains the content you want:
+
+   ```bash
+   cat artifacts/example.html | llm "We are trying to obtain the following information from a webpage scraped with wget: $info. Does the HTML contain this information, and if so, what is the pattern for extracting it? If not, does the page appear to be loaded dynamically, in which case we should use a more sophisticated scraping tool?" -m gemini-2.0-flash-001
+   ```
+
+4. **Looping and Processing Extracted Data with `while read`:**
+
+   ```bash
+   grep -o '<a href="https://example.com/[^"]*/">[^<]*</a>' artifacts/example.html |
+   while read -r line; do
+     url=$(echo "$line" | grep -o 'https://example.com/[^"]*/')
+     name=$(echo "$url" | sed 's|https://example.com/||' | sed 's|/$||' | sed 's|/|-|g')
+     echo "Downloading $name..."
+     wget -q -O artifacts/${name}.html ${url}
+   done
+   ```
+
+   - This example extracts matching links from the HTML, creates safe filenames from the URL paths, and downloads the linked pages.
+   - `while read` could be used for many kinds of looped processing over extracted data; this is just one example.
+
