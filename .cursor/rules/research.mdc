@@ -3,6 +3,39 @@ description: Finding data sources or answering questions with Internet search
 globs: 
 alwaysApply: false
 ---
-For deep Internet research and question-answering, you may find it helpful to send queries to a Perplexity research agent using your `perplexity` tool.
+## Prerequisites
 
-To find and scrape data from the Internet, you will probably want to use your web search tool with `wget`, your `playwright` tool, or scripted requests to an official API.
+- [Perplexity API key](https://www.perplexity.ai/settings/api)
+- Perplexity and Playwright MCP Tools: The user should put the following in `File > Cursor Settings > MCP > Add new global MCP server`, replacing `your_perplexity_api_key` with the actual Perplexity API key:
+   ```json
+   {
+      "mcpServers": {
+         "perplexity-mcp": {
+            "env": {
+            "PERPLEXITY_API_KEY": "your_perplexity_api_key",
+            "PERPLEXITY_MODEL": "sonar"
+            },
+            "command": "uvx",
+            "args": [
+            "mcp-perplexity"
+            ]
+         },
+         "playwright": {
+            "command": "npx",
+            "args": ["-y", "@executeautomation/playwright-mcp-server"]
+         }
+      }
+   }
+   ```
+
+If these tools are not available to you, guide the user through setup.
+
+## Deep Internet Research
+
+For deep Internet research and question-answering, send queries to a Perplexity research agent using the `mcp-perplexity` tool.
+
+If the Perplexity tool is not available and the user does not want to install it, you can use your built-in web search tool.
+
+## Direct Website Retrieval
+
+Perplexity and web search are not appropriate for direct website retrieval. For this, you should use `playwright` tool. If that is not available and the user does not want to install it, you may be able to use `wget`.

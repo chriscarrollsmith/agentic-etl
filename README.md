@@ -16,46 +16,21 @@ Most ETL repositories on Github are mechanical software tools designed for a spe
 
 After presenting your use case to the agent, you should prompt the agent to follow the steps in the order listed below.
 
-1. **Data Collection** - The agent can reference the `.cursor/rules/python_scraping.mdc` rule for help with scraping.
-2. **Data Processing** - The agent can reference the `.cursor/rules/python_cleaning.mdc` rule for help with transforming scraped data into clean JSON.
+1. **Data Collection** - The agent can reference the Bash or Python scraping rules for help with locating and scraping data.
+2. **Data Processing** - The agent can reference the Bash or Python cleaning rules for help with transforming scraped data into clean JSON.
+3. **Data Upload** - The agent can reference the Digital Ocean PostgreSQL setup and upload rules for help with setting up a database and uploading the data.
 
-The workflow is supported by Cursor Rules in the `.cursor/rules` directory that provide additional context and guidelines for AI agents working with the codebase.
+More languages, tools, and deployment options can be supported by adding additional Cursor rules to the `.cursor/rules` folder.
 
 ## Prerequisites
+
+Before getting started, I highly recommend installing at least the following:
 
 - [Cursor](https://www.cursor.com/)
 - [Node.js](https://nodejs.org/en/download/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- [LLM CLI utility](https://llm.datasette.io/en/stable/)
-- [Perplexity API Key](https://www.perplexity.ai/settings/api)
-- Perplexity and Playwright MCP Tools - Put the following in `File > Cursor Settings > MCP > Add new global MCP server`, replacing `your_perplexity_api_key` with your actual Perplexity API key:
-   ```json
-   {
-      "mcpServers": {
-         "perplexity-mcp": {
-            "env": {
-            "PERPLEXITY_API_KEY": "your_perplexity_api_key",
-            "PERPLEXITY_MODEL": "sonar"
-            },
-            "command": "uvx",
-            "args": [
-            "mcp-perplexity"
-            ]
-         },
-         "playwright": {
-            "command": "npx",
-            "args": ["-y", "@executeautomation/playwright-mcp-server"]
-         },
-         "taskmanager": {
-            "command": "npx",
-            "args": [
-            "-y",
-            "@chriscarrollsmith/mcp-taskmanager"
-            ]
-         }
-      }
-   }
-   ```
+
+Your Cursor Agent will walk you through the setup process for any additional required tools and resources for your use case, or perhaps even obtain and install them itself.
 
 ## Contributing
 
