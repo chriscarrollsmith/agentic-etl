@@ -3,27 +3,7 @@ description: Scraping Internet data with Python
 globs: 
 alwaysApply: false
 ---
-## 1. Lazy Self-Installation of Dependencies
-
-If you are working in a repository without a Python virtual environment or want a self-contained script, you can use the “uv” tool. The script’s header tells “uv” which Python version and dependencies are required:
-
-```python
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#     "playwright",
-# ]
-# ///
-```
-
-Run it with:
-
-```bash
-uv run main.py
-```
-
-## 2. Using Playwright with a Realistic User Agent
+## 1. Using Playwright with a Realistic User Agent
 
 Many websites detect and block requests that have default or no user agents, which can happen with libraries like requests or Playwright without customization. A realistic user agent can help mitigate this:
 
@@ -44,7 +24,7 @@ with sync_playwright() as p:
     browser.close()
 ```
 
-## 3. Randomized Delays to Avoid Rate Limiting
+## 2. Randomized Delays to Avoid Rate Limiting
 
 When scraping many pages, randomizing the delay between requests helps mimic human browsing behavior. This makes it less likely that you’ll get flagged or blocked:
 
@@ -60,7 +40,7 @@ for i in range(5):
     print(f"Scrape iteration {i+1}")
 ```
 
-## 4. Scraping Dynamically Loaded Data with Browser Automation
+## 3. Scraping Dynamically Loaded Data with Browser Automation
 
 Some sites load content via JavaScript after the initial HTML response. Tools like Playwright let you evaluate JavaScript directly in the browser context to scrape accurately:
 
@@ -82,7 +62,7 @@ data = page.evaluate("""() => {
 print(data)
 ```
 
-## 5. Detecting Actual File Types
+## 4. Detecting Actual File Types
 
 Sometimes, the HTTP headers can give misleading MIME types (e.g., claiming the document is HTML when it is actually PDF). You can detect the real file type by examining the file signature.
 
@@ -106,7 +86,7 @@ with requests.get(url, stream=True) as response:
   
 This helps you decide how to store or further process a downloaded file (e.g., what file extension to save it with).
 
-## 6. Paginating and Retrying Upon Errors
+## 5. Paginating and Retrying Upon Errors
 
 Many sites spread articles across multiple pages, and network issues or timeouts can occur. Looping through pages and implementing retries on failures helps you gather a complete dataset:
 
@@ -128,13 +108,13 @@ for page_num in range(1, 6):  # 5 pages
                 print("Skipping this page after reaching max retries.")
 ```
 
-## 7. Handling Errors and Validating and Organizing the Results
+## 6. Handling Errors and Validating and Organizing the Results
 
 - Fail gracefully by catching exceptions, logging errors, and continuing the workflow.
 - Inspect each field (e.g., URLs for download links) when done to catch any issues.
 - Store any relevant metadata (like MIME type).
 
-## 8. Skipping the Workflow if the Data Is Already Available
+## 7. Skipping the Workflow if the Data Is Already Available
 
 Before running your scraping workflow, check if the relevant JSON objects already exist and have non-null values. If it is, you can skip the workflow to save time and resources:
 

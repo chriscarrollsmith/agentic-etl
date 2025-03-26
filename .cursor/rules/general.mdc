@@ -11,6 +11,10 @@ This repository contains instructions to guide a Claude 3.7-powered Cursor Agent
 
 The workflow was created and documented with an eye to generalizability and repeatability by AI agents with minimal human intervention. The steps mostly involve MCP tool calls, CLI commands, and bash and python scripts, not web interfaces.
 
+## General rules
+
+Respond to the user's first message in a chat thread by checking whether `artifacts/project_plan.md` exists. If not, review the planning rules and formulate a project plan.
+
 Working documents and helper files which will not be retained may be placed in the `artifacts` folder.
 
 To avoid confusion, you should keep your bash console opened to the project root folder and should specify all file paths in relation to the project root.

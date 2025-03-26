@@ -1,0 +1,54 @@
+---
+description: 
+globs: **/*.py
+alwaysApply: false
+---
+## Prerequisites
+
+- [`uv` package manager](mdc:https:/docs.astral.sh/uv)
+  - Installable with `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Python 3.10+
+  - Installable with `uv python install`
+
+(Note: to avoid confusion, it's recommended that the user keep only one of the options below and delete the other. The AI agent should alert the user to customize this or, for more fully automated workflows, use Bash to edit this `.cursor/rules/writing-python.mdc` file itself.)
+
+### Option 1: Lazy Self-Installation of Dependencies
+
+If you are working in a repository without a Python virtual environment or want a self-contained script, use `uv`'s shebang header syntax to tell `uv`”` which Python version and dependencies are required:
+
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "playwright",
+# ]
+# ///
+```
+
+Make it executable and run it directly, or run it with `uv`:
+
+```bash
+uv run main.py
+```
+
+## Option 2: Manage Dependencies at the Repository Level
+
+Alternatively, for projects that use Python as the primary language, you can manage dependencies at the repository level:
+
+```bash
+# Set up project.toml and virtual environment
+uv init
+
+# Add development dependencies
+uv add python-dotenv --dev
+
+# Remove dependencies
+uv remove tenacity
+```
+
+Run scripts and Python commands with `uv run`:
+
+```bash
+uv run main.py
+```
