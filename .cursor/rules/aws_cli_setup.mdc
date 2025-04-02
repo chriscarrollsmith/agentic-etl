@@ -7,8 +7,10 @@ alwaysApply: false
 
 ## Prerequisites: AWS Account Setup
 
+Walk the user through AWS account setup if they don't already have one. (Or, if prompted to, use a browser tool to set up your own account.)
+
 1. Create an AWS Account:
-   - Go to [AWS Console](https://aws.amazon.com/)
+   - Go to [AWS Console](mdc:https:/aws.amazon.com)
    - Click "Create an AWS Account"
    - Follow the signup process (requires email, credit card)
    - Choose the "Basic Support - Free" tier
@@ -36,7 +38,6 @@ alwaysApply: false
    ```bash
    aws --version
    ```
-   Should show something like: `aws-cli/2.25.8 Python/3.12.9 Linux/6.8.0-56-generic`
 
 ## Configuration with AWS IAM Identity Center (SSO)
 
